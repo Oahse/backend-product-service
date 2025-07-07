@@ -91,15 +91,27 @@ class ProductVariant(Base):
     price: Mapped[float] = mapped_column(DECIMAL(10, 2), index=False)
     stock: Mapped[int] = mapped_column(Integer, default=0, index=True)  # Stock can be filtered
 
+class InventoryProduct(Base):
+    __tablename__ = "inventory_products"
+
+    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    inventory_id: Mapped[str] = mapped_column(ForeignKey("inventories.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+
+    quantity: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=5, index=True)
+
+    product: Mapped["Product"] = relationship("Product", backref="inventory_entries")
+    inventory: Mapped["Inventory"] = relationship("Inventory", backref="product_entries")
+
+
 class Inventory(Base):
     __tablename__ = "inventories"
 
     id: Mapped[str] = mapped_column(primary_key=True, index=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), unique=True, index=True)
-    product: Mapped["Product"] = relationship("Product", back_populates="inventory")
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    location: Mapped[Optional[str]] = mapped_column(String(200), index=False)
 
-    quantity: Mapped[int] = mapped_column(Integer, default=0, index=True)
-    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=5, index=True)
 
 class ProductImage(Base):
     __tablename__ = "product_images"

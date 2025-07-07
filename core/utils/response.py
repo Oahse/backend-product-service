@@ -113,3 +113,7 @@ def Response(data=None, success=True, message=None, code=200):
         },
         status_code=code
     )
+
+
+class NotFoundError(Exception):
+    pass
