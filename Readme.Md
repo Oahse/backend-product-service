@@ -1,6 +1,3 @@
-Got it! Here's the updated version including a clear setup step before running the servers:
-
----
 
 # backend-product-service
 
@@ -53,3 +50,30 @@ Visit these endpoints in your browser or API client:
 * ...
 
 ---
+
+**Setup and Run with Docker**
+
+1. Clone the repository:
+
+```
+git clone https://github.com/Oahse/backend-product-service.git
+cd backend-product-service
+```
+
+2. Run the Docker setup script:
+
+Make sure Docker is installed and running, then:
+
+```
+chmod +x run_docker.sh
+./run_docker.sh
+```
+
+This script will build and start the necessary containers (database, backend service, Redis, etc.).
+
+3. Access the API endpoints:
+
+```
+http://localhost:8000/api/v1/
+...
+```
