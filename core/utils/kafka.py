@@ -1,7 +1,14 @@
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 import asyncio
 import json
+import socket
 
+def is_kafka_available(host: str, port: int, timeout: float = 1.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout):
+            return True
+    except OSError:
+        return False
 
 
 class KafkaConsumer:

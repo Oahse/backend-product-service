@@ -28,14 +28,15 @@ class Settings:
     KAFKA_BOOTSTRAP_SERVERS : List[str] = parse_cors(os.getenv('KAFKA_BOOTSTRAP_SERVERS', "[localhost:9092]"))
     KAFKA_TOPIC: str = os.getenv('KAFKA_TOPIC', 'products_topic')
     KAFKA_GROUP: str = os.getenv('KAFKA_GROUP', 'product_group')
-    
+    KAFKA_HOST: str = os.getenv('KAFKA_HOST', 'kafka')
+    KAFKA_PORT: str = os.getenv('KAFKA_PORT', '9092')
     # Redis
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://default:4kZH1STNfGDscS29dCdbU7nJMPrDLZfh@redis-10990.c52.us-east-1-4.ec2.redns.redis-cloud.com:10990')
     
     ELASTIC_DB: str = os.getenv('ELASTIC_DB', "http://localhost:9200")
 
     # PostgreSQL
-    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'postgresql://postgres:localhost:5432/postgres')
+    POSTGRES_DB: str = 'postgresql+asyncpg://postgres:postgres@localhost:5432/postgres' #os.getenv('POSTGRES_DB', 'postgresql+asyncpg://postgres:postgres@localhost:5432/postgres')
 
     # SQLite (fallback if needed)
     SQLITE_DB_PATH: str = os.getenv('SQLITE_DB_PATH', 'db1.db')

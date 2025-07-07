@@ -5,7 +5,7 @@ from sqlalchemy import update, delete
 from sqlalchemy import and_, or_
 from typing import List, Optional
 from core.utils.generator import generator
-from models.inventory import (Product, Inventory,InventoryProduct)
+from models.products import (Product, Inventory,InventoryProduct)
 from schemas.inventory import (InventoryCreate)
 from core.utils.response import NotFoundError
 

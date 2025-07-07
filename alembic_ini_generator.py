@@ -1,7 +1,7 @@
 from core.config import settings  # Make sure to import your Settings class from the correct file
 
 # Get the database URI from the settings object
-SQLALCHEMY_DATABASE_URI = str(settings.SQLALCHEMY_DATABASE_URI)
+SQL_DATABASE_URI = str(settings.SQL_DATABASE_URI)
 
 # Alembic ini template with the dynamic sqlalchemy.url filled in
 alembic_ini_file = f"""
@@ -68,7 +68,7 @@ version_path_separator = os  # Use os.pathsep. Default configuration used for ne
 # output_encoding = utf-8
 
 # sqlalchemy.url = driver://user:pass@localhost/dbname
-sqlalchemy.url = {SQLALCHEMY_DATABASE_URI}
+sqlalchemy.url = {SQL_DATABASE_URI}
 
 [post_write_hooks]
 # post_write_hooks defines scripts or Python functions that are run

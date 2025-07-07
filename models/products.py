@@ -1,19 +1,18 @@
 from sqlalchemy.orm import mapped_column, Mapped, relationship, validates
-from sqlalchemy import Enum, Integer, String, DateTime, ForeignKey, Boolean, Text, BigInteger, Table, DECIMAL
+from sqlalchemy import Enum, Integer, String, DateTime, ForeignKey, Boolean, Text, BigInteger, Table, Column, DECIMAL
 from core.database import Base, CHAR_LENGTH
 from datetime import datetime
 from enum import Enum as PyEnum
 from typing import List, Optional, Dict, Any
 from models.category import Category
-from models.inventory import Inventory
 from models.tag import Tag
 
 # Many-to-many association table
 product_tags = Table(
     "product_tags",
     Base.metadata,
-    mapped_column("product_id", ForeignKey("products.id", ondelete="CASCADE"), primary_key=True, index=True),
-    mapped_column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True, index=True),
+    Column("product_id", ForeignKey("products.id", ondelete="CASCADE"), primary_key=True, index=True),
+    Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True, index=True),
 )
 
 class AvailabilityStatus(PyEnum):
@@ -118,3 +117,48 @@ class ProductImage(Base):
 
     def __repr__(self):
         return f"<ProductImage(id={self.id!r}, url={self.url!r}, is_primary={self.is_primary})>"
+
+class InventoryProduct(Base):
+    __tablename__ = "inventory_products"
+
+    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    inventory_id: Mapped[str] = mapped_column(ForeignKey("inventories.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+
+    quantity: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=5, index=True)
+
+    product: Mapped["Product"] = relationship("Product", backref="inventory_entries")
+    inventory: Mapped["Inventory"] = relationship("Inventory", backref="product_entries")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "inventory_id": self.inventory_id,
+            "product_id": self.product_id,
+            "quantity": self.quantity,
+            "low_stock_threshold": self.low_stock_threshold,
+        }
+
+    def __repr__(self):
+        return (f"<InventoryProduct(id={self.id!r}, inventory_id={self.inventory_id!r}, "
+                f"product_id={self.product_id!r}, quantity={self.quantity}, "
+                f"low_stock_threshold={self.low_stock_threshold})>")
+
+
+class Inventory(Base):
+    __tablename__ = "inventories"
+
+    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    location: Mapped[Optional[str]] = mapped_column(String(200), index=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "location": self.location,
+        }
+
+    def __repr__(self):
+        return f"<Inventory(id={self.id!r}, name={self.name!r}, location={self.location!r})>"

@@ -9,9 +9,8 @@ from routes.inventory import router as inventory_router
 from routes.promocode import router as promocode_router
 from routes.tag import router as tag_router
 from core.utils.response import Response, RequestValidationError 
-from core.utils.kafka import KafkaConsumer 
+from core.utils.kafka import KafkaConsumer ,is_kafka_available
 import asyncio
-from core.config import settings
 
 app = FastAPI(
     title="Product Service API",
@@ -82,14 +81,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return Response(message=message, success=False, code=422)
 
 # FastAPI event handler triggered on application startup
+
+
 @app.on_event("startup")
 async def startup():
     global consumer_task
-    # Start Kafka consumer connection
-    await kafka_consumer.start()
-    # Launch Kafka message consumption as background asyncio task
-    consumer_task = asyncio.create_task(kafka_consumer.consume())
-    print("Kafka consumer started.")
+    kafka_host = settings.KAFKA_HOST
+    kafka_port = int(settings.KAFKA_PORT)
+    if is_kafka_available(kafka_host, kafka_port):
+        try:
+            await kafka_consumer.start()
+            consumer_task = asyncio.create_task(kafka_consumer.consume())
+
+            print("Kafka consumer started.")
+        except Exception as e:
+            print(f"Failed to start Kafka consumer: {e}")
+            await kafka_consumer.stop()
+    else:
+        print("Kafka not available, skipping Kafka consumer start.")
+
 
 # FastAPI event handler triggered on application shutdown
 @app.on_event("shutdown")

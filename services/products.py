@@ -7,12 +7,10 @@ from typing import List, Optional
 from core.utils.generator import generator
 from datetime import datetime, timedelta
 from core.database import AsyncElasticsearch
-from models.products import (Product, ProductVariant, ProductImage,AvailabilityStatus)
+from models.products import (Product, ProductVariant, ProductImage,AvailabilityStatus,InventoryProduct, Tag)
 from schemas.products import (ProductCreate,ProductVariantCreate,ProductVariantUpdate)
-from models.tag import (Tag)
-from models.inventory import(InventoryProduct)
 from core.config import settings
-from core.utils.kafka import KafkaProducer , send_kafka_message
+from core.utils.kafka import KafkaProducer , send_kafka_message, is_kafka_available
 background_tasks= BackgroundTasks
 class ProductService:
     def __init__(self, db: AsyncSession, es: AsyncElasticsearch):  
@@ -191,18 +189,21 @@ class ProductService:
             await self.db.refresh(product)
             # Add Kafka sending as background task
             result =product
-            background_tasks.add_task(
-                send_kafka_message,
-                KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS, 
-                              topic=str(settings.KAFKA_TOPIC)
-                              ),
+            kafka_host = settings.KAFKA_HOST
+            kafka_port = int(settings.KAFKA_PORT)
+            if is_kafka_available(kafka_host, kafka_port):
+                background_tasks.add_task(
+                    send_kafka_message,
+                    KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS, 
+                                topic=str(settings.KAFKA_TOPIC)
+                                ),
 
-                {
-                    "product": result.to_dict(),
-                    'es':self.es,
-                    "action": "create"
-                }
-            )
+                    {
+                        "product": result.to_dict(),
+                        'es':self.es,
+                        "action": "create"
+                    }
+                )
             return result
 
         except Exception as e:
