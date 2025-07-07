@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file located in the parent directory
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-ENV_PATH = os.path.join(BASE_DIR, '.env.production')
+ENV_PATH = os.path.join(BASE_DIR, '.env')
 load_dotenv(ENV_PATH)
 
 
@@ -33,10 +33,10 @@ class Settings:
     # Redis
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://default:4kZH1STNfGDscS29dCdbU7nJMPrDLZfh@redis-10990.c52.us-east-1-4.ec2.redns.redis-cloud.com:10990')
     
-    ELASTIC_DB: str = os.getenv('ELASTIC_DB', "http://localhost:9200")
+    ELASTIC_DB: str = os.getenv('ELASTIC_DB', "http://elasticsearch:9200")
 
     # PostgreSQL
-    POSTGRES_DB: str = os.getenv('POSTGRES_DB','postgresql+asyncpg://postgres:postgres@localhost:5432/postgres')
+    POSTGRES_DB: str = os.getenv('POSTGRES_DB','postgresql+asyncpg://postgres:postgres@postgres:5432/users_db')
 
     # SQLite (fallback if needed)
     SQLITE_DB_PATH: str = os.getenv('SQLITE_DB_PATH', 'db1.db')

@@ -38,11 +38,12 @@ services:
     networks:
       - webnet
     healthcheck:
-      test: curl -s http://localhost:9200/_cluster/health || exit 1
+      test: curl -fs http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s || exit 1
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+
 
 
   postgres:

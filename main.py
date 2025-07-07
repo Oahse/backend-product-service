@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from core.config import Settings
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from core.database import AsyncElasticDB  # Your async Elasticsearch instance
+from core.database import get_elastic_db # Your async Elasticsearch instance
 from routes.products import router as product_router
 from routes.category import router as category_router
 from routes.inventory import router as inventory_router
@@ -88,17 +88,19 @@ async def startup():
     global consumer_task
     kafka_host = settings.KAFKA_HOST
     kafka_port = int(settings.KAFKA_PORT)
-    if is_kafka_available(kafka_host, kafka_port):
-        try:
-            await kafka_consumer.start()
-            consumer_task = asyncio.create_task(kafka_consumer.consume())
+    try:
+        await kafka_consumer.start()
+        consumer_task = asyncio.create_task(kafka_consumer.consume())
 
-            print("Kafka consumer started.")
-        except Exception as e:
-            print(f"Failed to start Kafka consumer: {e}")
-            await kafka_consumer.stop()
-    else:
-        print("Kafka not available, skipping Kafka consumer start.")
+        print("Kafka consumer started.")
+    except Exception as e:
+        print(f"Failed to start Kafka consumer: {e}")
+        await kafka_consumer.stop()
+    try:
+        esclient = await get_elastic_db()
+        await esclient.info()
+    except Exception as e:
+        print(f"Failed to start elastic search db: {e}")
 
 
 # FastAPI event handler triggered on application shutdown
@@ -107,6 +109,4 @@ async def shutdown():
     # Stop Kafka consumer gracefully
     await kafka_consumer.stop()
     print("Kafka consumer stopped.")
-    # Close the Elasticsearch connection properly
-    await AsyncElasticDB.close()
-    print("Elasticsearch connection closed.")
+    

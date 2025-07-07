@@ -1,11 +1,11 @@
 from datetime import datetime
 from enum import Enum as PyEnum
 from typing import List, Optional
-
+from decimal import Decimal
 from pydantic import BaseModel, Field, condecimal
-from schemas.inventory import InventoryProductCreate, InventoryProductRead
 from schemas.category import CategoryRead
 from schemas.tag import TagRead
+from schemas.inventory import InventoryRead
 
 class AvailabilityStatus(str, PyEnum):
     IN_STOCK = "In Stock"
@@ -26,7 +26,6 @@ class ProductImageRead(ProductImageBase):
     class Config:
         from_attributes = True
 
-
 class ProductVariantBase(BaseModel):
     variant_name: str = Field(..., max_length=100)
     sku: str = Field(..., max_length=100)
@@ -39,7 +38,7 @@ class ProductVariantCreate(ProductVariantBase):
 class ProductVariantUpdate(BaseModel):
     variant_name: Optional[str] = None
     sku: Optional[str] = None
-    price: Optional[float] = None
+    price: Optional[Decimal] = None
     stock: Optional[int] = None
 
 class ProductVariantRead(ProductVariantBase):
@@ -57,12 +56,12 @@ class ProductBase(BaseModel):
     availability: AvailabilityStatus = AvailabilityStatus.IN_STOCK
     rating: Optional[condecimal(max_digits=2, decimal_places=1)] = 0.0
     category_id: str
-    tag_ids: Optional[List[int]] = []
+    tag_ids: Optional[List[str]] = []
+    inventory_ids: Optional[List[str]] = []  # <-- changed from inventory_id
 
 class ProductCreate(ProductBase):
     variants: Optional[List[ProductVariantCreate]] = []
     images: Optional[List[ProductImageCreate]] = []
-    inventory: Optional[List[InventoryProductCreate]] = []
 
 class ProductRead(ProductBase):
     id: str
@@ -72,10 +71,7 @@ class ProductRead(ProductBase):
     tags: List[TagRead] = []
     variants: List[ProductVariantRead] = []
     images: List[ProductImageRead] = []
-    inventory: Optional[List[InventoryProductCreate]] = []
+    inventories: Optional[List[InventoryRead]] = []  # <-- changed from single inventory
 
     class Config:
         from_attributes = True
-
-class InventoryProductReadWithProduct(InventoryProductRead):
-    product: Optional[ProductRead]

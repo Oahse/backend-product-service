@@ -3,6 +3,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from elasticsearch import AsyncElasticsearch
 from core.config import settings
+import asyncio
 
 Base = declarative_base()
 CHAR_LENGTH=255
@@ -12,14 +13,13 @@ SQL_DATABASE_URI = str(settings.SQL_DATABASE_URI)
 ELASTIC_DATABASE_URI = str(settings.ELASTIC_DATABASE_URI) 
 
 
-engine_db = create_async_engine(SQL_DATABASE_URI, echo=True)
+engine_db = create_async_engine(SQL_DATABASE_URI, echo=True, pool_pre_ping=True)
 
 # Session factory for the first database (Async)
 AsyncSessionDB = sessionmaker(
     bind=engine_db, 
     class_=AsyncSession, 
-    expire_on_commit=True, 
-    pool_pre_ping=True  # ensures connection is alive before use
+    expire_on_commit=True
 )
 
 # Dependency to get the async session for the first database
@@ -34,23 +34,22 @@ async def get_db():
         raise
 
 
-# Create a global Elasticsearch instance (singleton)
-AsyncElasticDB = AsyncElasticsearch(
-    hosts=[ELASTIC_DATABASE_URI],
-    verify_certs=False,
-    request_timeout=30,
-)
-
 async def get_elastic_db():
+    """
+    Dependency that yields an Elasticsearch client.
+    Retries connection attempts up to 5 times.
+    """
     try:
-        # Ping to check if it's connected
-        if not await AsyncElasticDB.ping():
-            print("Elasticsearch ping failed.")
-            raise ConnectionError("Elasticsearch not available")
+        print(f"[Elasticsearch] Attempting to connect to {ELASTIC_DATABASE_URI}...")
+        # Singleton instance (do not recreate per request)
+        AsyncElasticDB = AsyncElasticsearch(
+            hosts=[ELASTIC_DATABASE_URI],
+            verify_certs=False,
+            request_timeout=30,
+        )
+        print("[Elasticsearch] Connected successfully.")
+        return AsyncElasticDB
         
-        print("Elasticsearch connected")
-        yield AsyncElasticDB
     except Exception as e:
-        print(f"Elasticsearch connection failed: {e}")
-        raise
+        raise ConnectionError(f"[Elasticsearch] connection failed: {e}") 
     

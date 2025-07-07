@@ -3,8 +3,8 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from services.inventory import InventoryService, InventoryProductService
-from schemas.inventory import InventoryCreate,InventoryProductCreate
+from services.inventory import InventoryService
+from schemas.inventory import InventoryCreate
 from core.utils.response import Response
 
 router = APIRouter(prefix="/api/v1/inventories", tags=["Inventories"])
@@ -71,80 +71,3 @@ async def delete_inventory(inventory_id: str, db: AsyncSession = Depends(get_db)
     except Exception as e:
         return Response(data=str(e), code=500)
 
-
-
-@router.get("/products/")
-async def get_all_inventory_products(
-    inventory_id: Optional[str] = None,
-    product_id: Optional[str] = None,
-    min_quantity: Optional[int] = None,
-    limit: int = 10,
-    offset: int = 0,
-    db: AsyncSession = Depends(get_db),
-):
-    svc = InventoryProductService(db)
-    try:
-        ents = await svc.get_all(inventory_id, product_id, min_quantity, limit, offset)
-        return Response(data=[ent.to_dict() for ent in ents])
-    except Exception as e:
-        return Response(data=str(e), code=500)
-
-
-@router.get("/products/{entry_id}")
-async def get_inventory_product(entry_id: str, db: AsyncSession = Depends(get_db)):
-    svc = InventoryProductService(db)
-    try:
-        ent = await svc.get_by_id(entry_id)
-        if ent is None:
-            return Response(message=f"InventoryProduct with id '{entry_id}' not found.", code=404)
-        return Response(data=ent.to_dict())
-    except Exception as e:
-        return Response(data=str(e), code=500)
-
-
-@router.post("/products/", status_code=status.HTTP_201_CREATED)
-async def create_inventory_product(
-    create_in: InventoryProductCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    svc = InventoryProductService(db)
-    try:
-        ent = await svc.create(
-            inventory_id=create_in.inventory_id,
-            product_id=create_in.product_id,
-            quantity=create_in.quantity,
-            low_stock_threshold=create_in.low_stock_threshold,
-        )
-        # svc.create returns either entity or raises exception
-        return Response(data=ent.to_dict(), code=201)
-    except Exception as e:
-        return Response(data=str(e), code=500)
-
-
-@router.put("/products/{entry_id}")
-async def update_inventory_product(
-    entry_id: str,
-    quantity: Optional[int] = None,
-    low_stock_threshold: Optional[int] = None,
-    db: AsyncSession = Depends(get_db),
-):
-    svc = InventoryProductService(db)
-    try:
-        ent = await svc.update(entry_id, quantity, low_stock_threshold)
-        if ent is None:
-            return Response(message=f"InventoryProduct with id '{entry_id}' not found.", code=404)
-        return Response(data=ent.to_dict())
-    except Exception as e:
-        return Response(data=str(e), code=500)
-
-
-@router.delete("/products/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_inventory_product(entry_id: str, db: AsyncSession = Depends(get_db)):
-    svc = InventoryProductService(db)
-    try:
-        res = await svc.delete(entry_id)
-        if not res:
-            return Response(message=f"InventoryProduct with id '{entry_id}' not found.", code=404)
-        return Response(message="InventoryProduct deleted successfully", code=204)
-    except Exception as e:
-        return Response(data=str(e), code=500)

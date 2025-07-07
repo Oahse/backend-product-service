@@ -32,7 +32,7 @@ click-repl==0.3.0
 cryptography==44.0.2
 dnspython==2.7.0
 elastic-transport==8.17.1
-elasticsearch==9.0.2
+elasticsearch==8.13.2
 email_validator==2.2.0
 fastapi==0.115.11
 fastapi-cli==0.0.7
