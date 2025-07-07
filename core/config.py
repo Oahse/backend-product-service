@@ -36,7 +36,7 @@ class Settings:
     ELASTIC_DB: str = os.getenv('ELASTIC_DB', "http://localhost:9200")
 
     # PostgreSQL
-    POSTGRES_DB: str = 'postgresql+asyncpg://postgres:postgres@localhost:5432/postgres' #os.getenv('POSTGRES_DB', 'postgresql+asyncpg://postgres:postgres@localhost:5432/postgres')
+    POSTGRES_DB: str = os.getenv('POSTGRES_DB','postgresql+asyncpg://postgres:postgres@localhost:5432/postgres')
 
     # SQLite (fallback if needed)
     SQLITE_DB_PATH: str = os.getenv('SQLITE_DB_PATH', 'db1.db')
