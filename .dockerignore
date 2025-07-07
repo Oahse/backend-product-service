@@ -1,0 +1,3 @@
+# Ignore local development data
+pgdata/
+*.db
