@@ -1,6 +1,5 @@
 #!/bin/sh
 
-set -e
 
 # Define colors
 RED="\033[0;31m"
@@ -15,6 +14,7 @@ error() { echo -e "${RED}[ERROR]${RESET} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 
 info "Waiting for postgres to be ready..."
+chmod +x ./wait-for-it.sh
 ./wait-for-it.sh postgres:5432 --timeout=30 --strict -- sh -c 'echo "[INFO] Database is up"'
 
 info "Making migration script executable..."
