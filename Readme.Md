@@ -1,5 +1,5 @@
-# backend-user-service
-A microservice responsible for managing user authentication, profile data, roles, and permissions. It handles user registration, login, token management, and user-related CRUD operations securely and efficiently.
+# backend-product-service
+A robust backend service responsible for managing the lifecycle of products in an ecommerce platform. It handles product creation, updating, and deletion, manages product details such as pricing, inventory, categories, tags, and variants, and supports product availability and search functionality. The service ensures accurate inventory tracking and integrates with other systems like order management and pricing engines to provide seamless product data consistency across the platform.
 
 # Start Local Server
 Use the command below to start
