@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -e
 
 # Step 1: Copy the environment file
 echo "Step 1: Copying the environment file..."
