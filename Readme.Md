@@ -53,5 +53,3 @@ Visit these endpoints in your browser or API client:
 * ...
 
 ---
-
-Let me know if you'd like me to include instructions for Docker or environment variable setup too!
