@@ -14,8 +14,8 @@ success() { echo -e "${GREEN}[SUCCESS]${RESET} $1"; }
 error() { echo -e "${RED}[ERROR]${RESET} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 
-info "Waiting for users-db to be ready..."
-./wait-for-it.sh users-db:5432 --timeout=30 --strict -- sh -c 'echo "[INFO] Database is up"'
+info "Waiting for postgres to be ready..."
+./wait-for-it.sh postgres:5432 --timeout=30 --strict -- sh -c 'echo "[INFO] Database is up"'
 
 info "Making migration script executable..."
 chmod +x ./run_migrations.sh && success "Migration script made executable"

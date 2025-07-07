@@ -17,8 +17,8 @@ info "downloading wait-for-it.sh."
 curl -o wait-for-it.sh https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh
 chmod +x wait-for-it.sh
 
-# Wait for users-db to be ready
-./wait-for-it.sh users-db:5432 --timeout=30 --strict -- info "Database is up"
+# Wait for postgres to be ready
+./wait-for-it.sh postgres:5432 --timeout=30 --strict -- info "Database is up"
 
 info "Making migration script executable..."
 chmod +x ./run_migrations.sh && success "Migration script made executable"

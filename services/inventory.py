@@ -3,17 +3,10 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import update, delete
 from sqlalchemy import and_, or_
-
 from typing import List, Optional
 from core.utils.generator import generator
-
-
-from models.products import (
-    Product, Inventory,InventoryProduct
-)
-from schemas.products import (
-    InventoryCreate
-)
+from models.inventory import (Product, Inventory,InventoryProduct)
+from schemas.inventory import (InventoryCreate)
 from core.utils.response import NotFoundError
 
 class InventoryService:
@@ -51,7 +44,7 @@ class InventoryService:
         result = await self.db.execute(select(Inventory).where(Inventory.id == inventory_id))
         inventory = result.scalar_one_or_none()
         if not inventory:
-            raise NotFoundError(f"Inventory with id {inventory_id} not found")
+            raise None
         return inventory
 
 
@@ -75,7 +68,7 @@ class InventoryService:
     async def update(self, inventory_id: str, inventory_in: InventoryCreate) -> Inventory:
         inventory = await self.get_by_id(inventory_id)
         if not inventory:
-            raise NotFoundError(f"Inventory with id '{inventory_id}' not found.")
+            raise None
         
         inventory.name = inventory_in.name
         inventory.location = inventory_in.location
@@ -93,7 +86,7 @@ class InventoryService:
     async def delete(self, inventory_id: str) -> bool:
         inventory = await self.get_by_id(inventory_id)
         if not inventory:
-            raise NotFoundError(f"Inventory with id '{inventory_id}' not found.")
+            raise None
         
         try:
             await self.db.delete(inventory)
@@ -140,13 +133,11 @@ class InventoryProductService:
             # Log the error here if you want
             # e.g. logger.error(f"Error fetching inventory products: {e}")
             await self.db.rollback()
-            raise  # re-raise or wrap in a custom error if desired
+            raise  e 
 
     async def get_by_id(self, entry_id: str) -> InventoryProduct:
         result = await self.db.execute(select(InventoryProduct).where(InventoryProduct.id == entry_id))
         entry = result.scalar_one_or_none()
-        if not entry:
-            raise NotFoundError(f"InventoryProduct with id {entry_id} not found")
         return entry
 
     async def create(
@@ -180,10 +171,10 @@ class InventoryProductService:
         try:
             await self.db.commit()
             await self.db.refresh(entry)
-            return entry, None
+            return entry
         except Exception as e:
             await self.db.rollback()
-            return None, e
+            return e
 
     
 
@@ -195,7 +186,7 @@ class InventoryProductService:
     ) -> tuple[bool, Optional[Exception]]:
         entry = await self.get_by_id(entry_id)
         if not entry:
-            raise NotFoundError(f"InventoryProduct with id {entry_id} not found")
+            raise None
 
         if quantity is not None:
             entry.quantity = quantity
@@ -205,16 +196,16 @@ class InventoryProductService:
         try:
             await self.db.commit()
             await self.db.refresh(entry)
-            return True, None
+            return entry
         except Exception as e:
             await self.db.rollback()
-            return False, e
+            return e
 
     async def delete(self, entry_id: str) -> bool:
         entry = await self.get_by_id(entry_id)
         
         if not entry:
-            return False
+            return None
         try:
             await self.db.delete(entry)
             await self.db.commit()

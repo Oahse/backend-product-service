@@ -3,40 +3,14 @@ from enum import Enum as PyEnum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, condecimal
-
+from schemas.inventory import InventoryProductCreate, InventoryProductRead
+from schemas.category import CategoryRead
+from schemas.tag import TagRead
 
 class AvailabilityStatus(str, PyEnum):
     IN_STOCK = "In Stock"
     OUT_OF_STOCK = "Out of Stock"
     PREORDER = "Preorder"
-
-
-class TagBase(BaseModel):
-    name: str = Field(..., max_length=100)
-
-class TagCreate(TagBase):
-    pass
-
-class TagRead(TagBase):
-    id: str
-
-    class Config:
-        from_attributes = True
-
-
-class CategoryBase(BaseModel):
-    name: str = Field(..., max_length=100)
-    description: Optional[str] = None
-
-class CategoryCreate(CategoryBase):
-    pass
-
-class CategoryRead(CategoryBase):
-    id: str
-
-    class Config:
-        from_attributes = True
-
 
 class ProductImageBase(BaseModel):
     url: str
@@ -61,63 +35,18 @@ class ProductVariantBase(BaseModel):
 
 class ProductVariantCreate(ProductVariantBase):
     pass
+
 class ProductVariantUpdate(BaseModel):
     variant_name: Optional[str] = None
     sku: Optional[str] = None
     price: Optional[float] = None
     stock: Optional[int] = None
+
 class ProductVariantRead(ProductVariantBase):
     id: str
 
     class Config:
         from_attributes = True
-
-# ---------- Inventory Schemas ----------
-
-class InventoryBase(BaseModel):
-    name: str
-    location: Optional[str] = None
-
-
-class InventoryCreate(InventoryBase):
-    pass
-
-
-class InventoryUpdate(InventoryBase):
-    pass
-
-
-class InventoryRead(InventoryBase):
-    id: str
-
-    class Config:
-        from_attributes = True
-
-
-# ---------- InventoryProduct Schemas ----------
-
-class InventoryProductBase(BaseModel):
-    quantity: int = 0
-    low_stock_threshold: int = 5
-
-
-class InventoryProductCreate(InventoryProductBase):
-    inventory_id: str
-    product_id: str
-
-
-class InventoryProductUpdate(InventoryProductBase):
-    pass
-
-
-class InventoryProductRead(InventoryProductBase):
-    id: str
-    inventory_id: str
-    product_id: str
-
-    class Config:
-        from_attributes = True
-
 
 class ProductBase(BaseModel):
     name: str = Field(..., max_length=100)
@@ -148,22 +77,5 @@ class ProductRead(ProductBase):
     class Config:
         from_attributes = True
 
-
-class PromoCodeBase(BaseModel):
-    code: str = Field(..., max_length=50)
-    discount_percent: condecimal(max_digits=5, decimal_places=2)
-    active: bool = True
-    valid_from: datetime
-    valid_until: datetime
-
-class PromoCodeCreate(PromoCodeBase):
-    pass
-
-class PromoCodeRead(PromoCodeBase):
-    id: str
-
-    class Config:
-        from_attributes = True
-        
 class InventoryProductReadWithProduct(InventoryProductRead):
     product: Optional[ProductRead]

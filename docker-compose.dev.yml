@@ -7,31 +7,54 @@ services:
       - KAFKA_CFG_NODE_ID=0
       - KAFKA_CFG_PROCESS_ROLES=controller,broker
       - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092  # <== important for inter-container comm
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
       - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_KRAFT_CLUSTER_ID=abcdefghijklmnopqrstuv
     restart: always
     networks:
       - webnet
     ports:
       - "9092:9092"
     healthcheck:
-      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "kafka:9092", "--list"]
       interval: 10s
       retries: 5
       timeout: 10s
       start_period: 30s
 
-  users-db:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false  # Disable auth for dev
+    
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - webnet
+    healthcheck:
+      test: curl -s http://localhost:9200/_cluster/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+
+  postgres:
     image: postgres:16-alpine
-    container_name: users-db
+    container_name: postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: users_db
     
     volumes:
-      - users-db-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
 
     ports:
       - "5432:5432"
@@ -44,15 +67,17 @@ services:
       start_period: 30s
       timeout: 10s
 
-  userservice:
+  productsservice:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: userservice
+    container_name: productsservice
     depends_on:
       kafka:
         condition: service_healthy
-      users-db:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     ports:
       - "8000:8000"
@@ -71,5 +96,7 @@ networks:
     driver: bridge
 
 volumes:
-  users-db-data:
+  postgres-data:
+    external: false
+  elasticsearch-data:
     external: false

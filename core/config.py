@@ -25,15 +25,17 @@ class Settings:
     DOMAIN: str = os.getenv('DOMAIN', 'localhost')
     ENVIRONMENT: Literal["local", "staging", "production"] = os.getenv('ENVIRONMENT', 'local')
 
+    KAFKA_BOOTSTRAP_SERVERS : List[str] = parse_cors(os.getenv('KAFKA_BOOTSTRAP_SERVERS', "[localhost:9092]"))
+    KAFKA_TOPIC: str = os.getenv('KAFKA_TOPIC', 'products_topic')
+    KAFKA_GROUP: str = os.getenv('KAFKA_GROUP', 'product_group')
+    
     # Redis
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://default:4kZH1STNfGDscS29dCdbU7nJMPrDLZfh@redis-10990.c52.us-east-1-4.ec2.redns.redis-cloud.com:10990')
+    
+    ELASTIC_DB: str = os.getenv('ELASTIC_DB', "http://localhost:9200")
 
     # PostgreSQL
-    POSTGRES_USER: str = os.getenv('POSTGRES_USER', 'postgres')
-    POSTGRES_PASSWORD: str = os.getenv('POSTGRES_PASSWORD', 'postgres')
-    POSTGRES_SERVER: str = os.getenv('POSTGRES_SERVER', 'localhost')
-    POSTGRES_PORT: int = int(os.getenv('POSTGRES_PORT', 5432))
-    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'users_db')
+    POSTGRES_DB: str = os.getenv('POSTGRES_DB', 'postgresql://postgres:localhost:5432/postgres')
 
     # SQLite (fallback if needed)
     SQLITE_DB_PATH: str = os.getenv('SQLITE_DB_PATH', 'db1.db')
@@ -50,24 +52,31 @@ class Settings:
         return f"http://{self.DOMAIN}" if self.ENVIRONMENT == "local" else f"https://{self.DOMAIN}"
 
     @property
-    def SQLALCHEMY_DATABASE_URI(self) -> str:
+    def SQL_DATABASE_URI(self) -> str:
         if self.ENVIRONMENT in ["local"]:
             # return f"sqlite+aiosqlite:///{self.SQLITE_DB_PATH}"  # SQLite URI
-            return (
-                f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-                f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-            )
+            return self.POSTGRES_DB
+        
         elif self.ENVIRONMENT in ["staging", "production"]:
             # for docker
             # return 'postgresql+asyncpg://postgres:postgres@users-db:5432/users_db'
 
             # for render
-            return 'postgresql+asyncpg://postgres:fAdvot-vyggeg-1rysku@db.htvauholjqlrfihihszd.supabase.co:5432/postgres'
+            return self.POSTGRES_DB
+        else:
+            raise ValueError("Invalid ENVIRONMENT for database connection")
 
-            # return (
-            #     f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            #     f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-            # )
+    @property
+    def ELASTIC_DATABASE_URI(self) -> str:
+        if self.ENVIRONMENT in ["local"]:
+            # return f"sqlite+aiosqlite:///{self.SQLITE_DB_PATH}"  # SQLite URI
+            return self.ELASTIC_DB
+        elif self.ENVIRONMENT in ["staging", "production"]:
+            # for docker
+            # return self.ELASTIC_DB
+
+            # for render
+            return self.ELASTIC_DB
         else:
             raise ValueError("Invalid ENVIRONMENT for database connection")
 
