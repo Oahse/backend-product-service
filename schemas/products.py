@@ -49,7 +49,6 @@ class ProductVariantRead(ProductVariantBase):
 
 class ProductBase(BaseModel):
     name: str = Field(..., max_length=100)
-    sku: str = Field(..., max_length=100)
     description: Optional[str] = None
     base_price: condecimal(max_digits=10, decimal_places=2)
     sale_price: Optional[condecimal(max_digits=10, decimal_places=2)] = None

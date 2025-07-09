@@ -13,7 +13,6 @@ router = APIRouter(prefix="/api/v1/products", tags=["Products"])
 async def search_products(
     q: Optional[str] = None,
     name: Optional[str] = None,
-    sku: Optional[str] = None,
     category_id: Optional[str] = None,
     tag_id: Optional[str] = None,
     availability: Optional[AvailabilityStatus] = None,
@@ -27,7 +26,7 @@ async def search_products(
     esclient = await get_elastic_db()
     service = ProductService(db, esclient)
     try:
-        result = await service.search(q, name, sku, category_id, tag_id, availability,
+        result = await service.search(q, name, category_id, tag_id, availability,
                                       min_price, max_price, min_rating, limit, offset)
         return Response(data=result)
     except Exception as e:
@@ -37,7 +36,6 @@ async def search_products(
 @router.get("/")
 async def get_all_products(
     name: Optional[str] = None,
-    sku: Optional[str] = None,
     category_id: Optional[str] = None,
     tag_id: Optional[str] = None,
     availability: Optional[AvailabilityStatus] = None,
@@ -52,7 +50,7 @@ async def get_all_products(
     service = ProductService(db, esclient)
     try:
         products = await service.get_all(
-            name, sku, category_id, tag_id, availability,
+            name, category_id, tag_id, availability,
             min_price, max_price, min_rating, limit, offset
         )
         return Response(data=[p.to_dict() for p in products])
@@ -79,6 +77,8 @@ async def create_product(product_in: ProductCreate, db: AsyncSession = Depends(g
     service = ProductService(db, esclient)
     try:
         product = await service.create(product_in)
+        print(product,'prododfdfdfdfddfdfdf')
+        print(product.to_dict())
         return Response(data=product.to_dict(), code=201)
     except Exception as e:
         return Response(success=False, message=str(e), code=500)

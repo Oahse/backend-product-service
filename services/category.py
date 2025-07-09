@@ -41,7 +41,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def get_by_id(self, category_id: int) -> Category:
+    async def get_by_id(self, category_id: int) -> Optional[Category]:
         result = await self.db.execute(select(Category).where(Category.id == category_id))
         category = result.scalar_one_or_none()
         return category

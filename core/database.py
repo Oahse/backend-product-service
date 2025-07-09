@@ -1,7 +1,7 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from elasticsearch import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch, Elasticsearch
 from core.config import settings
 import asyncio
 
@@ -19,7 +19,7 @@ engine_db = create_async_engine(SQL_DATABASE_URI, echo=True, pool_pre_ping=True)
 AsyncSessionDB = sessionmaker(
     bind=engine_db, 
     class_=AsyncSession, 
-    expire_on_commit=True
+    expire_on_commit=False
 )
 
 # Dependency to get the async session for the first database
@@ -52,4 +52,22 @@ async def get_elastic_db():
         
     except Exception as e:
         raise ConnectionError(f"[Elasticsearch] connection failed: {e}") 
+
+
+def get_elastic_db_sync():
+    """
+    Returns a synchronous Elasticsearch client instance.
+    """
+    try:
+        print(f"[Elasticsearch] Attempting to connect to {ELASTIC_DATABASE_URI}...")
+        es = Elasticsearch(
+            [ELASTIC_DATABASE_URI],
+            verify_certs=False,
+            timeout=30
+        )
+        print("[Elasticsearch] Connected successfully.")
+        return es
+    except Exception as e:
+        print(f"[Elasticsearch] Connection failed: {e}")
+        raise
     

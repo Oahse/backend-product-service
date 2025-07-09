@@ -14,12 +14,6 @@ product_tags = Table(
     Column("product_id", ForeignKey("products.id", ondelete="CASCADE"), primary_key=True, index=True),
     Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True, index=True),
 )
-product_inventory = Table(
-    "product_inventory",
-    Base.metadata,
-    Column("product_id", ForeignKey("products.id", ondelete="CASCADE"), primary_key=True, index=True),
-    Column("inventory_id", ForeignKey("inventories.id", ondelete="CASCADE"), primary_key=True, index=True),
-)
 
 # --- Enum for product availability ---
 class AvailabilityStatus(PyEnum):
@@ -33,7 +27,6 @@ class Product(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(CHAR_LENGTH), index=True)
-    sku: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
 
     category_id: Mapped[Optional[str]] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)
@@ -50,11 +43,16 @@ class Product(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    inventory_products: Mapped[List["InventoryProduct"]] = relationship(
+        "InventoryProduct", back_populates="product", cascade="all, delete-orphan"
+    )
     inventories: Mapped[List["Inventory"]] = relationship(
         "Inventory",
-        secondary=product_inventory,
-        back_populates="products"
+        secondary="inventory_products",
+        back_populates="products",
+        viewonly=True,
     )
+    
     variants: Mapped[List["ProductVariant"]] = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
     images: Mapped[List["ProductImage"]] = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
 
@@ -62,24 +60,23 @@ class Product(Base):
         return {
             "id": self.id,
             "name": self.name,
-            "sku": self.sku,
             "description": self.description,
             "category_id": self.category_id,
-            "category": self.category.to_dict() if self.category else None,
+            "category": self.category.name if self.category else None,
             "tags": [tag.to_dict() for tag in self.tags],
             "base_price": float(self.base_price),
             "sale_price": float(self.sale_price) if self.sale_price else None,
-            "availability": self.availability.name if self.availability else None,
+            "availability": self.availability.value if self.availability else None,
             "rating": float(self.rating) if self.rating else 0.0,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "variants": [v.to_dict() for v in self.variants],
             "images": [img.to_dict() for img in self.images],
-            "inventory": self.inventory.to_dict() if self.inventory else None,
+            "inventories": [inv.to_dict() for inv in self.inventories],
         }
 
     def __repr__(self):
-        return f"<Product(id={self.id!r}, name={self.name!r}, sku={self.sku!r})>"
+        return f"<Product(id={self.id!r}, name={self.name!r}, category={self.category!r})>"
 
 # --- ProductVariant Model ---
 class ProductVariant(Base):
@@ -134,22 +131,45 @@ class ProductImage(Base):
 # --- Inventory Model ---
 class Inventory(Base):
     __tablename__ = "inventories"
-
     id: Mapped[str] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     location: Mapped[Optional[str]] = mapped_column(String(200))
 
+    inventory_products: Mapped[List["InventoryProduct"]] = relationship(
+        "InventoryProduct", back_populates="inventory", cascade="all, delete-orphan"
+    )
     products: Mapped[List["Product"]] = relationship(
         "Product",
-        secondary=product_inventory,
-        back_populates="inventories"
+        secondary="inventory_products",
+        back_populates="inventories",
+        viewonly=True,
     )
+
     def to_dict(self):
         return {
             "id": self.id,
             "name": self.name,
             "location": self.location,
+            "products": [ip.product.to_dict() for ip in self.inventory_products],
+            "product_counts": {ip.product_id: ip.quantity for ip in self.inventory_products}
         }
 
-    def __repr__(self):
-        return f"<Inventory(id={self.id!r}, name={self.name!r}, location={self.location!r})>"
+class InventoryProduct(Base):
+    __tablename__ = "inventory_products"
+
+    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    inventory_id: Mapped[str] = mapped_column(ForeignKey("inventories.id"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"))
+    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, default=0)  # optional
+
+    inventory: Mapped["Inventory"] = relationship("Inventory", back_populates="inventory_products")
+    product: Mapped["Product"] = relationship("Product", back_populates="inventory_products")
+
+    def to_dict(self):
+        return {
+            "inventory_id": self.inventory_id,
+            "product_id": self.product_id,
+            "quantity": self.quantity,
+            "low_stock_threshold": self.low_stock_threshold,
+        }

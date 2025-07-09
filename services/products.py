@@ -1,30 +1,46 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, and_
+from sqlalchemy.orm import selectinload
 from fastapi import BackgroundTasks
 from typing import List, Optional
 from datetime import datetime
-
+from sqlalchemy.exc import DBAPIError
 from core.utils.generator import generator
 from core.database import get_elastic_db
-from models.products import Product, ProductVariant, ProductImage, AvailabilityStatus, Tag
+from models.products import Product, ProductVariant, ProductImage, AvailabilityStatus, Tag,InventoryProduct
 from schemas.products import ProductCreate, ProductVariantCreate, ProductVariantUpdate
+from services.category import CategoryService
 from core.config import settings
 from core.utils.kafka import KafkaProducer, send_kafka_message, is_kafka_available
 
-background_tasks = BackgroundTasks()
+kafka_producer = KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS,
+                                topic=str(settings.KAFKA_TOPIC))
+
+
+def generate_sku(product_name: str, variant_name: str, unique_id: str) -> str:
+    # Take first 3 letters of product name (uppercase, remove spaces)
+    product_code = ''.join(product_name.upper().split())[:3]
+
+    # Take first 3 letters of variant name (uppercase, remove spaces)
+    variant_code = ''.join(variant_name.upper().split())[:3]
+
+    # Use last 4 chars of unique_id or some unique suffix (can be timestamp, uuid, etc.)
+    suffix = unique_id[-4:].upper()
+
+    sku = f"{product_code}-{variant_code}-{suffix}"
+    return sku
 
 
 class ProductService:
     def __init__(self, db: AsyncSession, es):
         self.db = db
         self.es = es
-
+        
     async def search(
         self,
         q: Optional[str] = None,
         name: Optional[str] = None,
-        sku: Optional[str] = None,
         category_id: Optional[str] = None,
         tag_id: Optional[str] = None,
         availability: Optional[AvailabilityStatus] = None,
@@ -47,8 +63,7 @@ class ProductService:
 
             if name:
                 must_clauses.append({"match": {"name": name}})
-            if sku:
-                must_clauses.append({"match": {"sku": sku}})
+            
             if category_id:
                 must_clauses.append({"term": {"category_id": category_id}})
             if tag_id:
@@ -83,7 +98,6 @@ class ProductService:
     async def get_all(
         self,
         name: Optional[str] = None,
-        sku: Optional[str] = None,
         category_id: Optional[str] = None,
         tag_id: Optional[str] = None,
         availability: Optional[AvailabilityStatus] = None,
@@ -94,13 +108,18 @@ class ProductService:
         offset: int = 0,
     ) -> List[Product]:
         try:
-            query = select(Product)
+            query = select(Product).options(
+                        selectinload(Product.category),
+                        selectinload(Product.tags),
+                        selectinload(Product.variants),
+                        selectinload(Product.images),
+                        selectinload(Product.inventories),
+                    )
             filters = []
 
             if name:
                 filters.append(Product.name.ilike(f"%{name}%"))
-            if sku:
-                filters.append(Product.sku == sku)
+            
             if category_id:
                 filters.append(Product.category_id == category_id)
             if availability:
@@ -128,31 +147,46 @@ class ProductService:
             raise e
 
     async def get_by_id(self, product_id: str) -> Optional[Product]:
-        result = await self.db.execute(select(Product).where(Product.id == product_id))
+        result = await self.db.execute(select(Product).options(
+                        selectinload(Product.category),
+                        selectinload(Product.tags),
+                        selectinload(Product.variants),
+                        selectinload(Product.images),
+                        selectinload(Product.inventories),
+                    ).where(Product.id == product_id))
         return result.scalar_one_or_none()
 
     async def create(self, product_in: ProductCreate) -> Product:
-        try:
-            tags = []
-            if product_in.tag_ids:
+        tags = []
+        if product_in.tag_ids:
+            try:
                 result = await self.db.execute(select(Tag).where(Tag.id.in_(product_in.tag_ids)))
                 tags = result.scalars().all()
+            except Exception as e:
+                await self.db.rollback()
+                # Optionally log the error here
+                raise e
+        category = CategoryService(self.db)
 
-            product = Product(
-                id=str(generator.get_id()),
-                name=product_in.name,
-                sku=product_in.sku,
-                description=product_in.description,
-                base_price=product_in.base_price,
-                sale_price=product_in.sale_price,
-                availability=product_in.availability,
-                rating=product_in.rating or 0.0,
-                category_id=product_in.category_id,
-                tags=tags
-            )
-            self.db.add(product)
+        res = await category.get_by_id(product_in.category_id)
+        if res is None:
+            raise ValueError(f"Invalid category_id: Category with {product_in.category_id} does not exist.")
+        product_id = str(generator.get_id())
+        product = Product(
+            id=product_id,
+            name=product_in.name,
+            description=product_in.description,
+            base_price=product_in.base_price,
+            sale_price=product_in.sale_price,
+            availability=AvailabilityStatus(product_in.availability),
+            rating=product_in.rating or 0.0,
+            category_id=product_in.category_id,
+            tags=tags
+        )
+        self.db.add(product)
+        try:
+            
             await self.db.flush()
-
             for variant_in in product_in.variants or []:
                 variant = ProductVariant(
                     product_id=product.id,
@@ -183,26 +217,34 @@ class ProductService:
                         low_stock_threshold=0  # adjust if needed
                     )
                     self.db.add(inventory_product)
-
             await self.db.commit()
-            await self.db.refresh(product)
 
+            
+            # Reload product with relationships eagerly loaded
+            product = await self.get_by_id(product_id)
+            if not product:
+                raise Exception("Product not found")
             # Kafka background task
-            kafka_host = settings.KAFKA_HOST
-            kafka_port = int(settings.KAFKA_PORT)
-            if is_kafka_available(kafka_host, kafka_port):
-                background_tasks.add_task(
-                    send_kafka_message,
-                    KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS,
-                                  topic=str(settings.KAFKA_TOPIC)),
-                    {
-                        "product": product.to_dict(),
-                        "es": self.es,
-                        "action": "create"
-                    }
-                )
+            await kafka_producer.start()
+            await kafka_producer.send({
+                    "product": product.to_dict(),
+                    "action": "create"
+                })
+            await kafka_producer.stop()
+            # background_tasks.add_task(
+            #     send_kafka_message,
+            #     KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS,
+            #                     topic=str(settings.KAFKA_TOPIC)),
+            #     {
+            #         "product": product.to_dict(),
+            #         "es": self.es,
+            #         "action": "create"
+            #     }
+            # )
             return product
+        
         except Exception as e:
+            print(e,'------','error')
             await self.db.rollback()
             raise e
 
@@ -212,7 +254,7 @@ class ProductService:
             raise Exception("Product not found")
 
         try:
-            for field in ["name", "sku", "description", "base_price", "sale_price", "availability", "rating", "category_id"]:
+            for field in ["name", "description", "base_price", "sale_price", "availability", "rating", "category_id"]:
                 val = getattr(product_in, field, None)
                 if val is not None:
                     setattr(product, field, val)

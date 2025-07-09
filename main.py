@@ -2,15 +2,16 @@ from fastapi import FastAPI, Request
 from core.config import Settings
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from core.database import get_elastic_db # Your async Elasticsearch instance
+from core.database import get_elastic_db,get_elastic_db_sync # Your async Elasticsearch instance
 from routes.products import router as product_router
 from routes.category import router as category_router
 from routes.inventory import router as inventory_router
 from routes.promocode import router as promocode_router
 from routes.tag import router as tag_router
 from core.utils.response import Response, RequestValidationError 
-from core.utils.kafka import KafkaConsumer ,is_kafka_available
+from core.utils.kafka import KafkaConsumer,KafkaProducer ,is_kafka_available
 import asyncio
+
 
 app = FastAPI(
     title="Product Service API",
@@ -25,8 +26,12 @@ settings = Settings()
 kafka_consumer = KafkaConsumer(
     broker=",".join(settings.KAFKA_BOOTSTRAP_SERVERS),
     topic=str(settings.KAFKA_TOPIC),
-    group_id=str(settings.KAFKA_GROUP)
+    group_id=str(settings.KAFKA_GROUP),
+    es=get_elastic_db_sync()
 )
+
+kafka_producer = KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS,
+                                topic=str(settings.KAFKA_TOPIC))
 
 consumer_task = None  # This will hold the asyncio task for consuming Kafka messages
 
@@ -93,6 +98,12 @@ async def startup():
         consumer_task = asyncio.create_task(kafka_consumer.consume())
 
         print("Kafka consumer started.")
+        await kafka_producer.start()
+        await kafka_producer.send({
+            "product": {"id": "abc123", "name": "Test Product"},
+            "action": "create"
+        })
+
     except Exception as e:
         print(f"Failed to start Kafka consumer: {e}")
         await kafka_consumer.stop()
