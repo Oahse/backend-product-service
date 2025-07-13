@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from core.config import Settings
+from core.config import Settings, logging
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from core.database import get_elastic_db,get_elastic_db_sync # Your async Elasticsearch instance
@@ -97,27 +97,25 @@ async def startup():
         await kafka_consumer.start()
         consumer_task = asyncio.create_task(kafka_consumer.consume())
 
-        print("Kafka consumer started.")
-        await kafka_producer.start()
-        await kafka_producer.send({
-            "product": {"id": "abc123", "name": "Test Product"},
-            "action": "create"
-        })
-
     except Exception as e:
-        print(f"Failed to start Kafka consumer: {e}")
+        logging.critical(f"Failed to start Kafka consumer: {e}")
         await kafka_consumer.stop()
+        await kafka_producer.stop()
     try:
         esclient = await get_elastic_db()
         await esclient.info()
     except Exception as e:
-        print(f"Failed to start elastic search db: {e}")
-
+        logging.critical(f"Failed to start elastic search db: {e}")
+        
+    
+    logging.info("App started")
 
 # FastAPI event handler triggered on application shutdown
 @app.on_event("shutdown")
 async def shutdown():
     # Stop Kafka consumer gracefully
     await kafka_consumer.stop()
-    print("Kafka consumer stopped.")
+    logging.critical("Kafka consumer stopped.")
+    await kafka_producer.stop()
+    logging.critical("Kafka producer stopped.")
     

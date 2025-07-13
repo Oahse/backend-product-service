@@ -26,7 +26,7 @@ async def get_all_categories(
 
 
 @router.get("/{category_id}")
-async def get_category_by_id(category_id: int, db: AsyncSession = Depends(get_db)):
+async def get_category_by_id(category_id: str, db: AsyncSession = Depends(get_db)):
     service = CategoryService(db)
     try:
         res = await service.get_by_id(category_id)
@@ -48,7 +48,7 @@ async def create_category(category_in: CategoryCreate, db: AsyncSession = Depend
 
 
 @router.put("/{category_id}")
-async def update_category(category_id: int, category_in: CategoryCreate, db: AsyncSession = Depends(get_db)):
+async def update_category(category_id: str, category_in: CategoryCreate, db: AsyncSession = Depends(get_db)):
     service = CategoryService(db)
     try:
         res = await service.update(category_id, category_in)
@@ -60,7 +60,7 @@ async def update_category(category_id: int, category_in: CategoryCreate, db: Asy
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_category(category_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_category(category_id: str, db: AsyncSession = Depends(get_db)):
     service = CategoryService(db)
     try:
         res = await service.delete(category_id)

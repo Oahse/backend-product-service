@@ -8,15 +8,19 @@ from datetime import datetime
 from sqlalchemy.exc import DBAPIError
 from core.utils.generator import generator
 from core.database import get_elastic_db
-from models.products import Product, ProductVariant, ProductImage, AvailabilityStatus, Tag,InventoryProduct
-from schemas.products import ProductCreate, ProductVariantCreate, ProductVariantUpdate
+import json
+from models.products import Product, ProductVariant, ProductVariantImage,ProductVariantAttribute, AvailabilityStatus, Tag,InventoryProduct
+from schemas.products import ProductCreate, ProductVariantCreate,ProductVariantUpdate,ProductVariantRead,ProductVariantAttributeCreate, ProductVariantImageCreate
 from services.category import CategoryService
 from core.config import settings
 from core.utils.kafka import KafkaProducer, send_kafka_message, is_kafka_available
-
+from core.utils.barcode import Barcode
 kafka_producer = KafkaProducer(broker=settings.KAFKA_BOOTSTRAP_SERVERS,
                                 topic=str(settings.KAFKA_TOPIC))
 
+def generate_barcode(data, logo_path=None, filename='barcode.png', save_as_png=False):
+    barcode = Barcode()
+    return barcode.generate_barcode(data=data, logo_path=logo_path, filename=filename, save_as_png=save_as_png)
 
 def generate_sku(product_name: str, variant_name: str, unique_id: str) -> str:
     # Take first 3 letters of product name (uppercase, remove spaces)
@@ -36,7 +40,12 @@ class ProductService:
     def __init__(self, db: AsyncSession, es):
         self.db = db
         self.es = es
-        
+    async def resolve_tags(self, tag_ids: List[str]) -> List[Tag]:
+        if not tag_ids:
+            return []
+        result = await self.db.execute(select(Tag).where(Tag.id.in_(tag_ids)))
+        return result.scalars().all()
+
     async def search(
         self,
         q: Optional[str] = None,
@@ -90,7 +99,8 @@ class ProductService:
                 "size": limit
             }
 
-            result = await self.es.search(index="products", body=query_body)
+            result = await self.es.search(index="products", query=query_body["query"], from_=offset, size=limit)
+
             return [hit["_source"] for hit in result["hits"]["hits"]]
         except Exception as e:
             raise e
@@ -112,7 +122,6 @@ class ProductService:
                         selectinload(Product.category),
                         selectinload(Product.tags),
                         selectinload(Product.variants),
-                        selectinload(Product.images),
                         selectinload(Product.inventories),
                     )
             filters = []
@@ -150,8 +159,9 @@ class ProductService:
         result = await self.db.execute(select(Product).options(
                         selectinload(Product.category),
                         selectinload(Product.tags),
-                        selectinload(Product.variants),
-                        selectinload(Product.images),
+                        selectinload(Product.variants).selectinload(ProductVariant.images),
+                        selectinload(Product.variants).selectinload(ProductVariant.attributes),
+
                         selectinload(Product.inventories),
                     ).where(Product.id == product_id))
         return result.scalar_one_or_none()
@@ -160,8 +170,7 @@ class ProductService:
         tags = []
         if product_in.tag_ids:
             try:
-                result = await self.db.execute(select(Tag).where(Tag.id.in_(product_in.tag_ids)))
-                tags = result.scalars().all()
+                tags = await self.resolve_tags(product_in.tag_ids)
             except Exception as e:
                 await self.db.rollback()
                 # Optionally log the error here
@@ -188,23 +197,27 @@ class ProductService:
             
             await self.db.flush()
             for variant_in in product_in.variants or []:
+                vid = str(generator.get_id())
+                sku=generate_sku(product_in.name, variant_in.variant_name, vid)
                 variant = ProductVariant(
-                    product_id=product.id,
-                    variant_name=variant_in.variant_name,
-                    sku=variant_in.sku,
+                    id=vid,
+                    product_id=product_id,
+                    sku=sku,
                     price=variant_in.price,
                     stock=variant_in.stock,
+                    barcode=str(generate_barcode(json.dumps({
+                        'id':vid,
+                        'product_id':product_id,
+                        'sku':sku,
+                        'price':variant_in.price,
+                        'stock':variant_in.stock
+                        }), 
+                        logo_path=None, 
+                        filename=f'{vid}.png', 
+                        save_as_png=False)
+                    )
                 )
                 self.db.add(variant)
-
-            for image_in in product_in.images or []:
-                image = ProductImage(
-                    product_id=product.id,
-                    url=image_in.url,
-                    alt_text=image_in.alt_text,
-                    is_primary=image_in.is_primary,
-                )
-                self.db.add(image)
 
             # Handle inventory ids (list) if provided
             if product_in.inventory_ids:
@@ -260,8 +273,7 @@ class ProductService:
                     setattr(product, field, val)
 
             if product_in.tag_ids is not None:
-                result = await self.db.execute(select(Tag).where(Tag.id.in_(product_in.tag_ids)))
-                product.tags = result.scalars().all()
+                product.tags = await self.resolve_tags(product_in.tag_ids)
 
             # Variants update logic
             incoming_variant_ids = {v.id for v in (product_in.variants or []) if getattr(v, "id", None)}
@@ -280,36 +292,15 @@ class ProductService:
                     variant.stock = variant_in.stock
                 else:
                     variant = ProductVariant(
+                        id=str(generator.get_id()),
                         product_id=product.id,
                         variant_name=variant_in.variant_name,
                         sku=variant_in.sku,
                         price=variant_in.price,
                         stock=variant_in.stock,
                     )
-                    self.db.add(variant)
+                self.db.add(variant)
 
-            # Images update logic
-            incoming_image_ids = {i.id for i in (product_in.images or []) if getattr(i, "id", None)}
-            existing_images = {i.id: i for i in product.images}
-
-            for image_id in list(existing_images.keys()):
-                if image_id not in incoming_image_ids:
-                    await self.db.delete(existing_images[image_id])
-
-            for image_in in product_in.images or []:
-                if getattr(image_in, "id", None) in existing_images:
-                    image = existing_images[image_in.id]
-                    image.url = image_in.url
-                    image.alt_text = image_in.alt_text
-                    image.is_primary = image_in.is_primary
-                else:
-                    image = ProductImage(
-                        product_id=product.id,
-                        url=image_in.url,
-                        alt_text=image_in.alt_text,
-                        is_primary=image_in.is_primary,
-                    )
-                    self.db.add(image)
 
             # Clear existing inventory products
             await self.db.execute(
@@ -354,19 +345,46 @@ class ProductVariantService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def add_variant(self, product_id: str, variant_in: ProductVariantCreate) -> ProductVariant:
+    async def add_variant(self,product_id:str,product_name:str, variant_in: ProductVariantCreate) -> ProductVariant:
         result = await self.db.execute(select(Product).where(Product.id == product_id))
         product = result.scalar_one_or_none()
         if not product:
-            raise Exception("Product not found")
+            raise HTTPException(status_code=404, detail="Product variant not found")
 
+        vid=str(generator.get_id())
+        sku=generate_sku(product_name, variant_in.variant_name, vid)
         variant = ProductVariant(
+            id=vid,
             product_id=product_id,
-            variant_name=variant_in.variant_name,
-            sku=variant_in.sku,
+            sku=sku,
             price=variant_in.price,
             stock=variant_in.stock,
+            barcode=str(generate_barcode(json.dumps({
+                'id':vid,
+                'product_id':product_id,
+                'sku':sku,
+                'price':variant_in.price,
+                'stock':variant_in.stock
+                }), 
+                logo_path=None, 
+                filename=f'{vid}.png', 
+                save_as_png=False)
+            )
         )
+
+        # Handle attributes
+        for attr in variant_in.attributes or []:
+
+            variant.attributes.append(
+                ProductVariantAttribute(variant_id=vid,name=attr.name, value=attr.value)
+            )
+
+        # Handle images
+        for image in variant_in.images or []:
+            variant.images.append(
+                ProductVariantImage(id=str(generator.get_id()),url=image.url)
+            )
+
         try:
             self.db.add(variant)
             await self.db.commit()
@@ -377,14 +395,20 @@ class ProductVariantService:
             raise e
 
     async def get_by_id(self, variant_id: str) -> Optional[ProductVariant]:
-        result = await self.db.execute(select(ProductVariant).where(ProductVariant.id == variant_id))
+        result = await self.db.execute(
+            select(ProductVariant)
+            .where(ProductVariant.id == variant_id)
+            .options(
+                selectinload(ProductVariant.attributes),
+                selectinload(ProductVariant.images)
+            )
+        )
         return result.scalar_one_or_none()
 
     async def get_all(
         self,
         product_id: Optional[str] = None,
         sku: Optional[str] = None,
-        variant_name: Optional[str] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
         min_stock: Optional[int] = None,
@@ -398,8 +422,6 @@ class ProductVariantService:
             filters.append(ProductVariant.product_id == product_id)
         if sku:
             filters.append(ProductVariant.sku == sku)
-        if variant_name:
-            filters.append(ProductVariant.variant_name.ilike(f"%{variant_name}%"))
         if min_price is not None:
             filters.append(ProductVariant.price >= min_price)
         if max_price is not None:
@@ -420,7 +442,20 @@ class ProductVariantService:
             raise Exception("Variant not found")
 
         for field, value in variant_in.dict(exclude_unset=True).items():
-            setattr(variant, field, value)
+            if field == "attributes":
+                variant.attributes.clear()
+                for attr in value:
+                    variant.attributes.append(
+                        ProductVariantAttribute(id=str(generator.get_id()),name=attr.name, value=attr.value)
+                    )
+            elif field == "images":
+                variant.images.clear()
+                for img in value:
+                    variant.images.append(
+                        ProductVariantImage(id=str(generator.get_id()),url=img.url)
+                    )
+            else:
+                setattr(variant, field, value)
 
         try:
             await self.db.commit()
@@ -441,3 +476,93 @@ class ProductVariantService:
         except Exception as e:
             await self.db.rollback()
             raise e
+
+
+class ProductVariantAttributeService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(self,variant_id:str, attr_in: ProductVariantAttributeCreate) -> ProductVariantAttribute:
+        attribute = ProductVariantAttribute(
+            id=str(generator.get_id()),
+            variant_id=variant_id,
+            name=attr_in.name,
+            value=attr_in.value
+        )
+        self.db.add(attribute)
+        await self.db.commit()
+        await self.db.refresh(attribute)
+        return attribute
+
+    async def get_by_id(self, attr_id: str) -> Optional[ProductVariantAttribute]:
+        result = await self.db.execute(select(ProductVariantAttribute).where(ProductVariantAttribute.id == attr_id))
+        return result.scalar_one_or_none()
+
+    async def get_all_by_variant(self, variant_id: str) -> List[ProductVariantAttribute]:
+        result = await self.db.execute(select(ProductVariantAttribute).where(ProductVariantAttribute.variant_id == variant_id))
+        return result.scalars().all()
+
+    async def update(self, attr_id: str, attr_in: ProductVariantAttributeCreate) -> ProductVariantAttribute:
+        attribute = await self.get_by_id(attr_id)
+        if not attribute:
+            raise Exception("Attribute not found")
+
+        for field, value in attr_in.dict(exclude_unset=True).items():
+            setattr(attribute, field, value)
+
+        await self.db.commit()
+        await self.db.refresh(attribute)
+        return attribute
+
+    async def delete(self, attr_id: str) -> bool:
+        attribute = await self.get_by_id(attr_id)
+        if not attribute:
+            raise Exception("Attribute not found")
+        await self.db.delete(attribute)
+        await self.db.commit()
+        return True
+
+
+class ProductVariantImageService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(self, variant_id: str, image_in: ProductVariantImageCreate) -> ProductVariantImage:
+        image = ProductVariantImage(
+            id=str(generator.get_id()),
+            variant_id=variant_id,
+            url=image_in.url
+        )
+        self.db.add(image)
+        await self.db.commit()
+        await self.db.refresh(image)
+        return image
+
+    async def get_by_id(self, image_id: str) -> Optional[ProductVariantImage]:
+        result = await self.db.execute(select(ProductVariantImage).where(ProductVariantImage.id == image_id))
+        return result.scalar_one_or_none()
+
+    async def get_all_by_variant(self, variant_id: str) -> List[ProductVariantImage]:
+        result = await self.db.execute(select(ProductVariantImage).where(ProductVariantImage.variant_id == variant_id))
+        return result.scalars().all()
+
+    async def update(self, image_id: str, image_in: ProductVariantImageCreate) -> ProductVariantImage:
+        image = await self.get_by_id(image_id)
+        if not image:
+            raise Exception("Image not found")
+
+        for field, value in image_in.dict(exclude_unset=True).items():
+            setattr(image, field, value)
+
+        await self.db.commit()
+        await self.db.refresh(image)
+        return image
+
+    async def delete(self, image_id: str) -> bool:
+        image = await self.get_by_id(image_id)
+        if not image:
+            raise Exception("Image not found")
+        await self.db.delete(image)
+        await self.db.commit()
+        return True
+

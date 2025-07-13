@@ -1,7 +1,12 @@
 import os
 from typing import Any, List, Literal
 from dotenv import load_dotenv
+import logging
 
+logging.basicConfig(
+    level=logging.DEBUG,  # Show all messages from DEBUG and up
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 # Load environment variables from .env file located in the parent directory
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 ENV_PATH = os.path.join(BASE_DIR, '.env')

@@ -41,7 +41,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def get_by_id(self, category_id: int) -> Optional[Category]:
+    async def get_by_id(self, category_id: str) -> Optional[Category]:
         result = await self.db.execute(select(Category).where(Category.id == category_id))
         category = result.scalar_one_or_none()
         return category
@@ -63,7 +63,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def update(self, category_id: int, category_in: CategoryCreate) -> Category:
+    async def update(self, category_id: str, category_in: CategoryCreate) -> Category:
         category = await self.get_by_id(category_id)
         if not category:
             return None
@@ -78,7 +78,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def delete(self, category_id: int) -> bool:
+    async def delete(self, category_id: str) -> bool:
         category = await self.get_by_id(category_id)
         if not category:
             return None

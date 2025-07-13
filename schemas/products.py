@@ -12,37 +12,60 @@ class AvailabilityStatus(str, PyEnum):
     OUT_OF_STOCK = "Out of Stock"
     PREORDER = "Preorder"
 
-class ProductImageBase(BaseModel):
-    url: str
-    alt_text: Optional[str] = None
-    is_primary: bool = False
+# --- Variant Attribute ---
+class ProductVariantAttributeBase(BaseModel):
+    name: str
+    value: str
 
-class ProductImageCreate(ProductImageBase):
+class ProductVariantAttributeCreate(ProductVariantAttributeBase):
     pass
 
-class ProductImageRead(ProductImageBase):
+class ProductVariantAttributeRead(ProductVariantAttributeBase):
     id: str
 
     class Config:
         from_attributes = True
 
-class ProductVariantBase(BaseModel):
-    variant_name: str = Field(..., max_length=100)
-    sku: str = Field(..., max_length=100)
-    price: condecimal(max_digits=10, decimal_places=2)
-    stock: int = 0
+# --- Variant Image ---
+class ProductVariantImageBase(BaseModel):
+    url: str
 
-class ProductVariantCreate(ProductVariantBase):
+class ProductVariantImageCreate(ProductVariantImageBase):
     pass
 
-class ProductVariantUpdate(BaseModel):
-    variant_name: Optional[str] = None
-    sku: Optional[str] = None
-    price: Optional[Decimal] = None
-    stock: Optional[int] = None
+class ProductVariantImageRead(ProductVariantImageBase):
+    id: str
+    variant_id: str
 
+    class Config:
+        from_attributes = True
+
+class ProductVariantBase(BaseModel):
+    price: float
+    stock: int = 0
+    variant_name: str
+
+
+# --- Create ---
+class ProductVariantCreate(ProductVariantBase):
+    attributes: Optional[List[ProductVariantAttributeCreate]] = []
+    images: Optional[List[ProductVariantImageCreate]] = []
+
+
+# --- Update ---
+class ProductVariantUpdate(BaseModel):
+    price: Optional[float]
+    stock: Optional[int]
+    attributes: Optional[List[ProductVariantAttributeCreate]] = []
+    images: Optional[List[ProductVariantImageCreate]] = []
+
+
+# --- Read / Response ---
 class ProductVariantRead(ProductVariantBase):
     id: str
+    product_id: str
+    attributes: List[ProductVariantAttributeRead] = []
+    images: List[ProductVariantImageRead] = []
 
     class Config:
         from_attributes = True
@@ -60,7 +83,6 @@ class ProductBase(BaseModel):
 
 class ProductCreate(ProductBase):
     variants: Optional[List[ProductVariantCreate]] = []
-    images: Optional[List[ProductImageCreate]] = []
 
 class ProductRead(ProductBase):
     id: str
@@ -69,7 +91,6 @@ class ProductRead(ProductBase):
     category: CategoryRead
     tags: List[TagRead] = []
     variants: List[ProductVariantRead] = []
-    images: List[ProductImageRead] = []
     inventories: Optional[List[InventoryRead]] = []  # <-- changed from single inventory
 
     class Config:

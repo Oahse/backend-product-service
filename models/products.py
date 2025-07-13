@@ -54,8 +54,7 @@ class Product(Base):
     )
     
     variants: Mapped[List["ProductVariant"]] = relationship("ProductVariant", back_populates="product", cascade="all, delete-orphan")
-    images: Mapped[List["ProductImage"]] = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
-
+    
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -71,7 +70,6 @@ class Product(Base):
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "variants": [v.to_dict() for v in self.variants],
-            "images": [img.to_dict() for img in self.images],
             "inventories": [inv.to_dict() for inv in self.inventories],
         }
 
@@ -86,47 +84,69 @@ class ProductVariant(Base):
     product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     product: Mapped["Product"] = relationship("Product", back_populates="variants")
 
-    variant_name: Mapped[str] = mapped_column(String(100), index=True)
     sku: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     price: Mapped[float] = mapped_column(DECIMAL(10, 2))
     stock: Mapped[int] = mapped_column(Integer, default=0)
+    barcode: Mapped[Optional[str]] = mapped_column(String(100), unique=True)
+
+    attributes: Mapped[List["ProductVariantAttribute"]] = relationship("ProductVariantAttribute", back_populates="variant", cascade="all, delete-orphan", lazy="selectin")
+    images: Mapped[List["ProductVariantImage"]] = relationship("ProductVariantImage", back_populates="variant", cascade="all, delete-orphan", lazy="selectin")
+
 
     def to_dict(self):
         return {
             "id": self.id,
             "product_id": self.product_id,
-            "variant_name": self.variant_name,
+
             "sku": self.sku,
             "price": float(self.price),
             "stock": self.stock,
+            "barcode": self.barcode,
+            "attributes": [attr.to_dict() for attr in self.attributes],
+            "images": [img.to_dict() for img in self.images],
         }
 
     def __repr__(self):
-        return f"<ProductVariant(id={self.id!r}, variant_name={self.variant_name!r}, sku={self.sku!r})>"
+        return f"<ProductVariant(id={self.id!r}, name={self.name!r}, value={self.value!r}, sku={self.sku!r})>"
 
-# --- ProductImage Model ---
-class ProductImage(Base):
-    __tablename__ = "product_images"
+
+class ProductVariantAttribute(Base):
+    __tablename__ = "product_variant_attributes"
 
     id: Mapped[str] = mapped_column(primary_key=True, index=True)
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
-    product: Mapped["Product"] = relationship("Product", back_populates="images")
+    variant_id: Mapped[str] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
+    variant: Mapped["ProductVariant"] = relationship("ProductVariant", back_populates="attributes")
 
-    url: Mapped[str] = mapped_column(Text)
-    alt_text: Mapped[Optional[str]] = mapped_column(String(CHAR_LENGTH))
-    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    name: Mapped[str] = mapped_column(String(100))  # e.g., Color
+    value: Mapped[str] = mapped_column(String(100))  # e.g., Red
 
     def to_dict(self):
         return {
             "id": self.id,
-            "product_id": self.product_id,
-            "url": self.url,
-            "alt_text": self.alt_text,
-            "is_primary": self.is_primary,
+            "variant_id": self.variant_id,
+            "name": self.name,
+            "value": self.value,
         }
 
-    def __repr__(self):
-        return f"<ProductImage(id={self.id!r}, url={self.url!r}, is_primary={self.is_primary})>"
+
+class ProductVariantImage(Base):
+    __tablename__ = "product_variant_images"
+
+    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    variant_id: Mapped[str] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
+    variant: Mapped["ProductVariant"] = relationship("ProductVariant", back_populates="images")
+
+    url: Mapped[str] = mapped_column(Text)
+    alt_text: Mapped[Optional[str]] = mapped_column(String(CHAR_LENGTH))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "variant_id": self.variant_id,
+            "url": self.url,
+            "alt_text": self.alt_text,
+        }
+
 
 # --- Inventory Model ---
 class Inventory(Base):
