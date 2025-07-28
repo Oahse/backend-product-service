@@ -1,6 +1,8 @@
 from sqlalchemy.orm import mapped_column, Mapped, relationship, validates
 from sqlalchemy import Enum, Integer, String, DateTime, ForeignKey, Boolean, Text, DECIMAL, Table, Column
 from core.database import Base, CHAR_LENGTH
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 from datetime import datetime
 from enum import Enum as PyEnum
 from typing import List, Optional, Dict, Any
@@ -25,11 +27,11 @@ class AvailabilityStatus(PyEnum):
 class Product(Base):
     __tablename__ = "products"
 
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(CHAR_LENGTH), index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
 
-    category_id: Mapped[Optional[str]] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)
+    category_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"), index=True)
     category: Mapped[Optional["Category"]] = relationship("Category")
 
     tags: Mapped[List["Tag"]] = relationship("Tag", secondary=product_tags, backref="products")
@@ -80,8 +82,8 @@ class Product(Base):
 class ProductVariant(Base):
     __tablename__ = "product_variants"
 
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     product: Mapped["Product"] = relationship("Product", back_populates="variants")
 
     sku: Mapped[str] = mapped_column(String(100), unique=True, index=True)
@@ -113,8 +115,8 @@ class ProductVariant(Base):
 class ProductVariantAttribute(Base):
     __tablename__ = "product_variant_attributes"
 
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
-    variant_id: Mapped[str] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    variant_id: Mapped[UUID] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
     variant: Mapped["ProductVariant"] = relationship("ProductVariant", back_populates="attributes")
 
     name: Mapped[str] = mapped_column(String(100))  # e.g., Color
@@ -132,8 +134,8 @@ class ProductVariantAttribute(Base):
 class ProductVariantImage(Base):
     __tablename__ = "product_variant_images"
 
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
-    variant_id: Mapped[str] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    variant_id: Mapped[UUID] = mapped_column(ForeignKey("product_variants.id", ondelete="CASCADE"))
     variant: Mapped["ProductVariant"] = relationship("ProductVariant", back_populates="images")
 
     url: Mapped[str] = mapped_column(Text)
@@ -151,7 +153,7 @@ class ProductVariantImage(Base):
 # --- Inventory Model ---
 class Inventory(Base):
     __tablename__ = "inventories"
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     location: Mapped[Optional[str]] = mapped_column(String(200))
 
@@ -177,9 +179,9 @@ class Inventory(Base):
 class InventoryProduct(Base):
     __tablename__ = "inventory_products"
 
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
-    inventory_id: Mapped[str] = mapped_column(ForeignKey("inventories.id"))
-    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"))
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    inventory_id: Mapped[UUID] = mapped_column(ForeignKey("inventories.id"))
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"))
     quantity: Mapped[int] = mapped_column(Integer, default=0)
     low_stock_threshold: Mapped[int] = mapped_column(Integer, default=0)  # optional
 

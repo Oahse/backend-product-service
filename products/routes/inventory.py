@@ -6,6 +6,8 @@ from core.database import get_db
 from services.inventory import InventoryService
 from schemas.inventory import InventoryCreate
 from core.utils.response import Response
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 router = APIRouter(prefix="/api/v1/inventories", tags=["Inventories"])
 
@@ -27,7 +29,7 @@ async def get_all_inventories(
 
 
 @router.get("/{inventory_id}")
-async def get_inventory(inventory_id: str, db: AsyncSession = Depends(get_db)):
+async def get_inventory(inventory_id: UUID, db: AsyncSession = Depends(get_db)):
     svc = InventoryService(db)
     try:
         inv = await svc.get_by_id(inventory_id)
@@ -49,7 +51,7 @@ async def create_inventory(inventory_in: InventoryCreate, db: AsyncSession = Dep
 
 
 @router.put("/{inventory_id}")
-async def update_inventory(inventory_id: str, inventory_in: InventoryCreate, db: AsyncSession = Depends(get_db)):
+async def update_inventory(inventory_id: UUID, inventory_in: InventoryCreate, db: AsyncSession = Depends(get_db)):
     svc = InventoryService(db)
     try:
         inv = await svc.update(inventory_id, inventory_in)
@@ -61,7 +63,7 @@ async def update_inventory(inventory_id: str, inventory_in: InventoryCreate, db:
 
 
 @router.delete("/{inventory_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_inventory(inventory_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_inventory(inventory_id: UUID, db: AsyncSession = Depends(get_db)):
     svc = InventoryService(db)
     try:
         res = await svc.delete(inventory_id)

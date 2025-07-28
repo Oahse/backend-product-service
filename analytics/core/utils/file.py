@@ -1,13 +1,40 @@
+from io import BytesIO
 from PIL import Image
 import mimetypes
 import os
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
 from google.auth.exceptions import DefaultCredentialsError,GoogleAuthError
 import google.auth
 from google_auth_oauthlib.flow import InstalledAppFlow
 import googleapiclient.errors
+import base64
+from core.config import settings
+
+def base64_to_webp(base64_str: str, quality: int = 30) -> str:
+    """
+    Converts a base64-encoded image to a reduced-quality WebP base64 string.
+
+    Args:
+        base64_str (str): Base64 string of the original image.
+        quality (int): Compression quality for WebP (0-100). Default is 30.
+
+    Returns:
+        str: Base64 string of the compressed .webp image.
+    """
+    # Decode base64 to image bytes
+    image_data = base64.b64decode(base64_str)
+    image = Image.open(BytesIO(image_data)).convert("RGB")
+
+    # Convert and compress to WebP in memory
+    buffer = BytesIO()
+    image.save(buffer, format="WEBP", quality=quality, method=6)
+    buffer.seek(0)
+
+    # Encode the optimized image to base64
+    webp_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    return webp_base64
 
 class ImageFile:
     @staticmethod
@@ -43,7 +70,7 @@ class ImageFile:
         print(f"Image saved with reduced quality at: {output_image_path}")
 
 class GoogleDrive:
-    def __init__(self, jsonkey='path/to/your/json/key.json'):
+    def __init__(self, jsonkey=settings.google_service_account_info):
         if not jsonkey:
             raise ValueError("The JSON key file path must be provided.")
         self.key = jsonkey
@@ -176,7 +203,54 @@ class GoogleDrive:
             return {'id': file['id'], 'link': file_info.get('webViewLink', 'No link available')}
         except Exception as e:
             raise Exception(f"An error occurred while uploading the file: {str(e)}")
+    
+    def base64_to_webp_file_object(base64_str: str, quality: int = 30) -> BytesIO:
+        """Convert base64 image to compressed WebP in-memory file object."""
+        image_data = base64.b64decode(base64_str)
+        image = Image.open(BytesIO(image_data)).convert("RGB")
+        buffer = BytesIO()
+        image.save(buffer, format="WEBP", quality=quality, method=6)
+        buffer.seek(0)
+        return buffer
 
+    def upload_base64_image_as_webp(self, base64_str: str, filename: str = "image.webp", folder_id=None, quality=30):
+        """
+        Uploads a base64 image as compressed WebP directly to Google Drive.
+        
+        Args:
+            base64_str (str): Base64 encoded image string.
+            filename (str): The filename to use on Google Drive, should end with .webp.
+            folder_id (str): Google Drive folder ID to upload into (optional).
+            quality (int): Compression quality for WebP (0-100).
+            
+        Returns:
+            dict: Uploaded file metadata including ID and link.
+        """
+        drive_service = self.get_drive_service()
+
+        # Convert base64 to WebP in-memory file
+        webp_file = self.base64_to_webp_file_object(base64_str, quality=quality)
+
+        file_metadata = {
+            'name': filename,
+            'parents': [folder_id] if folder_id else []
+        }
+
+        media = MediaIoBaseUpload(webp_file, mimetype='image/webp')
+
+        try:
+            file = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+
+            file_id = file['id']
+            file_info = drive_service.files().get(fileId=file_id, fields='webViewLink, webContentLink').execute()
+
+            return {'id': file_id, 'link': file_info.get('webViewLink', 'No link available')}
+        except Exception as e:
+            raise Exception(f"An error occurred while uploading the WebP image: {str(e)}")
     def download_file(self, file_id, destination_path='path/to/your/destination/file.txt'):
         """Downloads a file from Google Drive using the file ID."""
         if not file_id:
@@ -416,3 +490,22 @@ class YouTubeAPI:
 # # Get all videos in a playlist
 # playlist_id = 'your_playlist_id_here'
 # yt_api.get_playlist_contents(playlist_id)
+
+
+# # Instantiate GoogleDrive with your service account key
+# google_drive = GoogleDrive(jsonkey='path/to/your/json/key.json')
+
+# # Your input base64 image string (from anywhere, e.g., API request)
+# input_base64_image = "iVBORw0KGgoAAAANSUhEUgAA..."
+
+# # Upload it as compressed webp with quality 30
+# result = google_drive.upload_base64_image_as_webp(
+#     base64_str=input_base64_image,
+#     filename="my_image.webp",
+#     folder_id=None,  # Or your folder ID
+#     quality=30
+# )
+
+# print("Uploaded file ID:", result['id'])
+# print("Viewable link:", result['link'])
+

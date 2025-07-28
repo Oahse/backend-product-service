@@ -3,9 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy import and_, or_
 
 from typing import List, Optional
-from core.utils.generator import generator
-
-from models.category import (Category)
+from models.category import (Category, UUID, uuid)
 from schemas.category import (CategoryCreate)
 from core.utils.response import NotFoundError
 
@@ -41,7 +39,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def get_by_id(self, category_id: str) -> Optional[Category]:
+    async def get_by_id(self, category_id: UUID) -> Optional[Category]:
         result = await self.db.execute(select(Category).where(Category.id == category_id))
         category = result.scalar_one_or_none()
         return category
@@ -49,7 +47,6 @@ class CategoryService:
 
     async def create(self, category_in: CategoryCreate) -> Category:
         category = Category(
-            id=str(generator.get_id()),
             name=category_in.name,
             description=category_in.description,
         )
@@ -63,7 +60,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def update(self, category_id: str, category_in: CategoryCreate) -> Category:
+    async def update(self, category_id: UUID, category_in: CategoryCreate) -> Category:
         category = await self.get_by_id(category_id)
         if not category:
             return None
@@ -78,7 +75,7 @@ class CategoryService:
             # Optionally log the error here
             raise e
 
-    async def delete(self, category_id: str) -> bool:
+    async def delete(self, category_id: UUID) -> bool:
         category = await self.get_by_id(category_id)
         if not category:
             return None

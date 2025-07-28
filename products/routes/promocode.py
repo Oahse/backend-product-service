@@ -7,7 +7,8 @@ from core.database import get_db
 from services.promocode import PromoCodeService
 from schemas.promocode import PromoCodeCreate
 from core.utils.response import Response
-
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 router = APIRouter(prefix="/api/v1/promocodes", tags=["Promo Codes"])
 
 
@@ -29,7 +30,7 @@ async def get_all_promocodes(
 
 
 @router.get("/{promo_code_id}")
-async def get_promocode_by_id(promo_code_id: int, db: AsyncSession = Depends(get_db)):
+async def get_promocode_by_id(promo_code_id: UUID, db: AsyncSession = Depends(get_db)):
     service = PromoCodeService(db)
     try:
         res = await service.get_by_id(promo_code_id)
@@ -51,7 +52,7 @@ async def create_promocode(promo_in: PromoCodeCreate, db: AsyncSession = Depends
 
 
 @router.put("/{promo_code_id}")
-async def update_promocode(promo_code_id: int, promo_in: PromoCodeCreate, db: AsyncSession = Depends(get_db)):
+async def update_promocode(promo_code_id: UUID, promo_in: PromoCodeCreate, db: AsyncSession = Depends(get_db)):
     service = PromoCodeService(db)
     try:
         res = await service.update(promo_code_id, promo_in)
@@ -63,7 +64,7 @@ async def update_promocode(promo_code_id: int, promo_in: PromoCodeCreate, db: As
 
 
 @router.delete("/{promo_code_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_promocode(promo_code_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_promocode(promo_code_id: UUID, db: AsyncSession = Depends(get_db)):
     service = PromoCodeService(db)
     try:
         res = await service.delete(promo_code_id)

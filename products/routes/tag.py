@@ -6,7 +6,8 @@ from core.database import get_db
 from services.tag import TagService
 from schemas.tag import TagCreate
 from core.utils.response import Response
-
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 router = APIRouter(prefix="/api/v1/tags", tags=["Tags"])
 
 
@@ -26,7 +27,7 @@ async def get_all_tags(
 
 
 @router.get("/{tag_id}")
-async def get_tag_by_id(tag_id: int, db: AsyncSession = Depends(get_db)):
+async def get_tag_by_id(tag_id: UUID, db: AsyncSession = Depends(get_db)):
     service = TagService(db)
     try:
         tag = await service.get_by_id(tag_id)
@@ -48,7 +49,7 @@ async def create_tag(tag_in: TagCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{tag_id}")
-async def update_tag(tag_id: int, tag_in: TagCreate, db: AsyncSession = Depends(get_db)):
+async def update_tag(tag_id: UUID, tag_in: TagCreate, db: AsyncSession = Depends(get_db)):
     service = TagService(db)
     try:
         tag = await service.update(tag_id, tag_in)
@@ -61,7 +62,7 @@ async def update_tag(tag_id: int, tag_in: TagCreate, db: AsyncSession = Depends(
 
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_tag(tag_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_tag(tag_id: UUID, db: AsyncSession = Depends(get_db)):
     service = TagService(db)
     try:
         tag = await service.delete(tag_id)

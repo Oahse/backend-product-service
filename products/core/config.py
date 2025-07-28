@@ -1,7 +1,7 @@
 import os
 from typing import Any, List, Literal
 from dotenv import load_dotenv
-import logging
+import logging, json
 
 logging.basicConfig(
     level=logging.DEBUG,  # Show all messages from DEBUG and up
@@ -52,11 +52,24 @@ class Settings:
     # CORS
     RAW_CORS_ORIGINS: str = os.getenv('BACKEND_CORS_ORIGINS', '')
     BACKEND_CORS_ORIGINS: List[str] = parse_cors(RAW_CORS_ORIGINS)
-
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON', '')
+    
     @property
     def server_host(self) -> str:
         return f"http://{self.DOMAIN}" if self.ENVIRONMENT == "local" else f"https://{self.DOMAIN}"
-
+    @property
+    def google_service_account_info(self) -> dict:
+        """
+        Returns the parsed JSON content of the Google service account key,
+        or raises an error if it's missing or invalid.
+        """
+        if not self.GOOGLE_SERVICE_ACCOUNT_JSON:
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable is not set")
+        try:
+            return json.loads(self.GOOGLE_SERVICE_ACCOUNT_JSON)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+    
     @property
     def SQL_DATABASE_URI(self) -> str:
         if self.ENVIRONMENT in ["local"]:

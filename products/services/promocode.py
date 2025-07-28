@@ -5,7 +5,7 @@ from sqlalchemy import and_, or_, update, delete
 from typing import List, Optional
 from core.utils.generator import generator
 from datetime import datetime, timedelta
-from models.promocode import (PromoCode)
+from models.promocode import (PromoCode, UUID, uuid)
 from schemas.promocode import (PromoCodeCreate)
 
 
@@ -47,7 +47,7 @@ class PromoCodeService:
             await self.db.rollback()
             return e
     
-    async def get_by_id(self, promo_code_id: int) -> PromoCode:
+    async def get_by_id(self, promo_code_id: UUID) -> PromoCode:
         result = await self.db.execute(
             select(PromoCode).where(PromoCode.id == promo_code_id)
         )
@@ -56,7 +56,6 @@ class PromoCodeService:
 
     async def create(self, promo_in: PromoCodeCreate) -> PromoCode:
         promo = PromoCode(
-            id=str(generator.get_id()),
             code=promo_in.code,
             discount_percent=promo_in.discount_percent,
             active=promo_in.active,
@@ -73,7 +72,7 @@ class PromoCodeService:
             await self.db.rollback()
             raise RuntimeError("Failed to create promo code.") from e
 
-    async def update(self, promo_code_id: int, promo_in: PromoCodeCreate) -> PromoCode:
+    async def update(self, promo_code_id: UUID, promo_in: PromoCodeCreate) -> PromoCode:
         promo = await self.get_by_id(promo_code_id)
         if not promo:
             raise None
@@ -92,7 +91,7 @@ class PromoCodeService:
             await self.db.rollback()
             raise RuntimeError("Failed to update promo code.") from e
 
-    async def delete(self, promo_code_id: int) -> bool:
+    async def delete(self, promo_code_id: UUID) -> bool:
         promo = await self.get_by_id(promo_code_id)
         if not promo:
             raise None

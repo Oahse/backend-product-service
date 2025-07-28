@@ -6,6 +6,8 @@ from core.database import get_db
 from services.category import CategoryService
 from schemas.category import CategoryCreate, CategoryRead
 from core.utils.response import NotFoundError, Response
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 router = APIRouter(prefix="/api/v1/categories", tags=["Categories"])
 
@@ -26,7 +28,7 @@ async def get_all_categories(
 
 
 @router.get("/{category_id}")
-async def get_category_by_id(category_id: str, db: AsyncSession = Depends(get_db)):
+async def get_category_by_id(category_id: UUID, db: AsyncSession = Depends(get_db)):
     service = CategoryService(db)
     try:
         res = await service.get_by_id(category_id)
@@ -48,7 +50,7 @@ async def create_category(category_in: CategoryCreate, db: AsyncSession = Depend
 
 
 @router.put("/{category_id}")
-async def update_category(category_id: str, category_in: CategoryCreate, db: AsyncSession = Depends(get_db)):
+async def update_category(category_id: UUID, category_in: CategoryCreate, db: AsyncSession = Depends(get_db)):
     service = CategoryService(db)
     try:
         res = await service.update(category_id, category_in)
@@ -60,7 +62,7 @@ async def update_category(category_id: str, category_in: CategoryCreate, db: Asy
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_category(category_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_category(category_id: UUID, db: AsyncSession = Depends(get_db)):
     service = CategoryService(db)
     try:
         res = await service.delete(category_id)

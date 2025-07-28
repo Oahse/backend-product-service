@@ -2,12 +2,13 @@ from sqlalchemy.orm import mapped_column, Mapped
 from sqlalchemy import String, DateTime, Boolean,DECIMAL
 from core.database import Base, CHAR_LENGTH
 from datetime import datetime
-
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 
 class PromoCode(Base):
     __tablename__ = "promo_codes"
 
-    id: Mapped[str] = mapped_column(primary_key=True, index=True)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     discount_percent: Mapped[float] = mapped_column(DECIMAL(5, 2), index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)

@@ -86,7 +86,7 @@ async def create_product(product_in: ProductCreate, db: AsyncSession = Depends(g
 
 @router.put("/{product_id}")
 async def update_product(product_id: str, product_in: ProductCreate, db: AsyncSession = Depends(get_db)):
-    
+    esclient = await get_elastic_db()
     service = ProductService(db, esclient)
     try:
         product = await service.update(product_id, product_in)

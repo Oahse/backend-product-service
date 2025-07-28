@@ -2,8 +2,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
-from core.utils.generator import generator
-from models.tag import (Tag)
+from models.tag import (Tag, uuid, UUID)
 from schemas.tag import (TagCreate)
 from core.utils.response import NotFoundError
 
@@ -31,7 +30,7 @@ class TagService:
             # Optionally log the error here
             raise e
 
-    async def get_by_id(self, tag_id: int) -> Tag:
+    async def get_by_id(self, tag_id: UUID) -> Tag:
         try:
             result = await self.db.execute(select(Tag).where(Tag.id == tag_id))
             tag = result.scalar_one_or_none()
@@ -41,7 +40,7 @@ class TagService:
             raise e
 
     async def create(self, tag_in: TagCreate) -> Tag:
-        tag = Tag(id=str(generator.get_id()), name=tag_in.name)
+        tag = Tag(name=tag_in.name)
         self.db.add(tag)
         try:
             await self.db.commit()
@@ -52,7 +51,7 @@ class TagService:
             # Optionally log the exception here
             raise e
 
-    async def update(self, tag_id: int, tag_in: TagCreate) -> Tag:
+    async def update(self, tag_id: UUID, tag_in: TagCreate) -> Tag:
         tag = await self.get_by_id(tag_id)
         if not tag:
             raise None
@@ -66,7 +65,7 @@ class TagService:
             # Optional: log the exception here
             raise e
 
-    async def delete(self, inventory_id: str) -> bool:
+    async def delete(self, inventory_id: UUID) -> bool:
         inventory = await self.get_by_id(inventory_id)
         if not inventory:
             raise None

@@ -4,8 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import update, delete
 from sqlalchemy import and_, or_
 from typing import List, Optional
-from core.utils.generator import generator
-from models.products import (Product, Inventory)
+from models.products import (Product, Inventory, UUID, uuid)
 from schemas.inventory import (InventoryCreate)
 from core.utils.response import NotFoundError
 
@@ -40,7 +39,7 @@ class InventoryService:
             # optionally log error
             raise RuntimeError("Failed to fetch inventories") from e
 
-    async def get_by_id(self, inventory_id: str) -> Inventory:
+    async def get_by_id(self, inventory_id: UUID) -> Inventory:
         result = await self.db.execute(select(Inventory).where(Inventory.id == inventory_id))
         inventory = result.scalar_one_or_none()
         return inventory
@@ -48,7 +47,6 @@ class InventoryService:
 
     async def create(self, inventory_in: InventoryCreate) -> Inventory:
         inventory = Inventory(
-            id=str(generator.get_id()),
             name=inventory_in.name,
             location=inventory_in.location
         )
@@ -63,7 +61,7 @@ class InventoryService:
             raise e
 
 
-    async def update(self, inventory_id: str, inventory_in: InventoryCreate) -> Inventory:
+    async def update(self, inventory_id: UUID, inventory_in: InventoryCreate) -> Inventory:
         inventory = await self.get_by_id(inventory_id)
         if not inventory:
             raise None
@@ -81,7 +79,7 @@ class InventoryService:
             raise e
 
 
-    async def delete(self, inventory_id: str) -> bool:
+    async def delete(self, inventory_id: UUID) -> bool:
         inventory = await self.get_by_id(inventory_id)
         if not inventory:
             raise None
