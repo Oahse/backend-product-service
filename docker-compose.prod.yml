@@ -105,15 +105,39 @@ services:
       start_period: 30s
 
 
-  postgres:
+  orders-db:
     image: postgres:16-alpine
-    container_name: postgres
+    container_name: orders-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: users_db
+    
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - orders-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      - "5433:5433"
+    networks:
+      - webnet
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "users_db"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  
+  products-db:
+    image: postgres:16-alpine
+    container_name: products-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users_db
+    
+    volumes:
+      - products-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
     ports:
       - "5432:5432"
     networks:
@@ -128,29 +152,58 @@ services:
   productsservice:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./products/Dockerfile.dev
     container_name: productsservice
     depends_on:
       kafka:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      elasticsearch-node1:
+      elasticsearch:
         condition: service_healthy
     ports:
       - "8000:8000"
     networks:
       - webnet
+    volumes:
+      - ./products:/usr/src/app
     env_file:
       - .env
+    working_dir: /usr/src/app
     restart: unless-stopped
+
+  orderservice:
+    build:
+      context: .
+      dockerfile: ./orders/Dockerfile.dev
+    container_name: orderservice
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      
+    ports:
+      - "8001:8001"
+    networks:
+      - webnet
+    volumes:
+      - ./orders:/usr/src/app
+    env_file:
+      - .env
+    working_dir: /usr/src/app
+    restart: unless-stopped
+
+
 
 networks:
   webnet:
     driver: bridge
 
 volumes:
-  users-db-data:
+  products-db-data:
+  orders-db-data:
+  redis-data:
   elasticsearch-data-node1:
   elasticsearch-data-node2:
   elasticsearch-data-node3:
